@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace RefrienderCore {
 	[Flags]
@@ -50,7 +54,7 @@ namespace RefrienderCore {
 			}
 		}
 
-		ICompression GetHelper(CompressionAlgorithm algo) => algo switch {
+		ICompressionAlgo GetHelper(CompressionAlgorithm algo) => algo switch {
 			CompressionAlgorithm.Deflate => new DeflateHelper(),
 			CompressionAlgorithm.Zlib => new ZlibHelper(),
 			CompressionAlgorithm.Gzip => new GzipHelper(),
@@ -62,16 +66,26 @@ namespace RefrienderCore {
 			_ => throw new NotImplementedException()
 		};
 
-		IEnumerable<int> FindStarts(ICompression algo, int minLength) =>
-			Enumerable.Range(0, Data.Length - 1).AsParallel().Where(i => algo.TryDecompress(Data, i, Data.Length - i, minLength) == minLength);
-
-		(int Offset, int Length, int DecompressedLength) FindBlock(ICompression algo, int start) {
+		IEnumerable<int> FindStarts(ICompressionAlgo algo, int minLength) =>
+			Enumerable.Range(0, Data.Length - 1).AsParallel()
+				.Where(i => algo.TryDecompress(Data, i, Data.Length - i, minLength) >= minLength);
+ 
+		(int Offset, int Length, int DecompressedLength) FindBlock(ICompressionAlgo algo, int start) {
 			var top = Data.Length;
 			var bottom = start;
-			var dsize = algo.TryDecompress(Data, start, top - start);
+			var dsize = Math.Max(1, algo.TryDecompress(Data, start, top - start, 1));
+			while(true) {
+				var tsize = algo.TryDecompress(Data, start, top - start, dsize * 2);
+				if(tsize > dsize)
+					dsize = tsize;
+				else if(tsize == -1)
+					dsize *= 2;
+				else if(tsize > 0)
+					break;
+			}
 			while(top - bottom > 1) {
 				var middle = (top - bottom) / 2 + bottom;
-				var hsize = algo.TryDecompress(Data, start, middle - start);
+				var hsize = algo.TryDecompress(Data, start, middle - start, dsize);
 				if(hsize != dsize)
 					bottom = middle;
 				else

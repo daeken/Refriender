@@ -2,7 +2,7 @@
 using System.IO;
 
 namespace RefrienderCore {
-	abstract class ICompression {
+	abstract class StreamCompression : ICompressionAlgo {
 		public abstract CompressionAlgorithm Algorithm { get; }
 
 		public byte[] Decompress(byte[] data, int offset, int compressedSize, int decompressedSize) {
@@ -13,12 +13,12 @@ namespace RefrienderCore {
 			return bdata;
 		}
 
-		public int TryDecompress(byte[] data, int offset, int inputSize, int? maxLen = null) {
+		public int TryDecompress(byte[] data, int offset, int inputSize, int maxLen) {
 			using var ms = new MemoryStream(data, offset, inputSize);
 			using var ds = GetDecompressor(ms);
 			var size = 0;
 			try {
-				while((maxLen == null || size < maxLen) && ds.ReadByte() != -1)
+				while(size < maxLen && ds.ReadByte() != -1)
 					size++;
 			} catch(Exception) {
 				if(size == 0)

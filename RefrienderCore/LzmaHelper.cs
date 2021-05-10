@@ -2,7 +2,7 @@
 using SharpCompress.Compressors.LZMA;
 
 namespace RefrienderCore {
-	class LzmaHelper : ICompression {
+	class LzmaHelper : StreamCompression {
 		readonly bool Lzma2;
 		public override CompressionAlgorithm Algorithm => CompressionAlgorithm.Lzma;
 
