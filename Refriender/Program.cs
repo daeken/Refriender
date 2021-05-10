@@ -72,11 +72,12 @@ namespace Refriender {
 						foreach(var offset in offsets) {
 							if(opt.Verbose)
 								Console.WriteLine($"Finding pointers to {offset} bytes before the blocks");
-							foreach(var block in cf.Blocks.OrderBy(x => x.Offset)) {
-								var pointers = cf.FindPointers(block.Offset - offset).ToList();
-								if(pointers.Count != 0)
-									Console.WriteLine($"Block 0x{block.Offset:X}{(offset != 0 ? $" (- {offset} == 0x{block.Offset - offset:X})" : "")} has pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
-							}
+							var bpointers = cf.Blocks.AsParallel()
+								.Select(x => (x, cf.FindPointers(x.Offset - offset).ToList()))
+								.Where(x => x.Item2.Count != 0)
+								.OrderBy(x => x.x.Offset);
+							foreach(var (block, pointers) in bpointers)
+								Console.WriteLine($"Block 0x{block.Offset:X}{(offset != 0 ? $" (- {offset} == 0x{block.Offset - offset:X})" : "")} has pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
 						}
 					}
 
