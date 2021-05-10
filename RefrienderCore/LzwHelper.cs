@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using ICSharpCode.SharpZipLib.BZip2;
 using ICSharpCode.SharpZipLib.Lzw;
 
 namespace RefrienderCore {
