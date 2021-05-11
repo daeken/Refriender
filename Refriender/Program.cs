@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using CommandLine;
+using HeyRed.Mime;
+using MoreLinq;
 using RefrienderCore;
 
 namespace Refriender {
@@ -30,6 +32,8 @@ namespace Refriender {
 			public bool Verbose { get; set; }
 			[Option('s', "start-only", Required = false, HelpText = "Only find starting positions of blocks")]
 			public bool StartOnly { get; set; }
+			[Option('i', "identify", Required = false, HelpText = "Look for magic in decompressed blocks")]
+			public bool Identify { get; set; }
 			[Option('p', "preserve-overlapping", Required = false, HelpText = "Preserve overlapping blocks")]
 			public bool PreserveOverlapping { get; set; }
 			[Option('e', "extract-to", Required = false, HelpText = "Path for extraction")]
@@ -45,7 +49,7 @@ namespace Refriender {
 		}
 		static void Main(string[] args) {
 			Parser.Default.ParseArguments<Options>(args).WithParsed(opt => {
-				if(opt.Quiet && (opt.StartOnly || opt.Verbose || opt.FindPointers != null || opt.ExtractTo == null))
+				if(opt.Quiet && (opt.StartOnly || opt.Verbose || opt.Identify || opt.FindPointers != null || opt.ExtractTo == null))
 					throw new NotSupportedException(); // TODO: Error messages
 				var algorithms = (CompressionAlgorithm) opt.Algorithms.Split(',')
 					.Select(x => (int) Algorithms[x.Trim().ToLower()]).Sum();
@@ -58,7 +62,7 @@ namespace Refriender {
 				} else {
 					if(!opt.Quiet) {
 						foreach(var block in cf.Blocks.OrderBy(x => x.Offset))
-							Console.WriteLine($"[{RevAlgorithms[block.Algorithm]}] 0x{block.Offset:X} - 0x{block.Offset + block.CompressedLength:X} (compressed length 0x{block.CompressedLength:X}, decompressed length 0x{block.DecompressedLength:X}");
+							Console.WriteLine($"[{RevAlgorithms[block.Algorithm]}] 0x{block.Offset:X} - 0x{block.Offset + block.CompressedLength:X} (compressed length 0x{block.CompressedLength:X}, decompressed length 0x{block.DecompressedLength:X})");
 						Console.WriteLine($"{cf.Blocks.Count} blocks found");
 					}
 
@@ -82,15 +86,27 @@ namespace Refriender {
 						}
 					}
 
-					if(opt.ExtractTo == null) return;
-					if(opt.Verbose) Console.WriteLine("Beginning block extraction");
-					Directory.CreateDirectory(opt.ExtractTo);
-					foreach(var block in cf.Blocks) {
-						var fn = $"0x{block.Offset:X}-0x{block.Offset+block.CompressedLength:X}_{RevAlgorithms[block.Algorithm]}.bin";
-						var bdata = cf.Decompress(block);
-						File.WriteAllBytes(Path.Join(opt.ExtractTo, fn), bdata);
+					if(opt.ExtractTo == null && !opt.Identify) return;
+					if(opt.Identify) {
+						if(opt.Verbose) Console.WriteLine("Beginning block identification");
+						cf.Blocks.AsParallel().Select(block => {
+							var bdata = cf.Decompress(block);
+							var magic = new Magic(MagicOpenFlags.MAGIC_NONE);
+							return (Block: block, Magic: magic.Read(bdata, bdata.Length));
+						}).Where(x => x.Magic != "data").OrderBy(x => x.Block.Offset).ForEach(x =>
+							Console.WriteLine($"[{RevAlgorithms[x.Block.Algorithm]}] 0x{x.Block.Offset:X} - 0x{x.Block.Offset + x.Block.CompressedLength:X} (decompressed length 0x{x.Block.DecompressedLength:X}): {x.Magic}"));
 					}
-					if(opt.Verbose) Console.WriteLine("Done!");
+					if(opt.ExtractTo != null) {
+						if(opt.Verbose) Console.WriteLine("Beginning block extraction");
+						Directory.CreateDirectory(opt.ExtractTo);
+						foreach(var block in cf.Blocks) {
+							var fn =
+								$"0x{block.Offset:X}-0x{block.Offset + block.CompressedLength:X}_{RevAlgorithms[block.Algorithm]}.bin";
+							var bdata = cf.Decompress(block);
+							File.WriteAllBytes(Path.Join(opt.ExtractTo, fn), bdata);
+						}
+						if(opt.Verbose) Console.WriteLine("Done!");
+					}
 				}
 			});
 		}

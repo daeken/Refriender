@@ -1,9 +1,6 @@
 ﻿using System;
-using System.IO;
-using K4os.Compression.LZ4;
 using K4os.Compression.LZ4.Streams;
 using Microsoft.Toolkit.HighPerformance;
-using Microsoft.Toolkit.HighPerformance.Streams;
 
 namespace RefrienderCore {
 	class Lz4FrameHelper : MemoryCompression {
