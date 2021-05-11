@@ -18,12 +18,14 @@ From the Refriender project subdirectory:
 
   -s, --start-only              Only find starting positions of blocks
 
+  -i, --identify                Look for magic in decompressed blocks
+
   -p, --preserve-overlapping    Preserve overlapping blocks
 
   -e, --extract-to              Path for extraction
 
   -a, --algorithms              (Default: all) Comma-separated list of algorithms (valid options: all (!SLOW!), deflate, zlib, gzip,
-                                bzip2, lzma, lzma2, lzw)
+                                bzip2, lzma, lzma2, lzw, lz4raw, lz4frame)
 
   -f, --find-pointers           Comma-separated list of offsets/ranges in which to search for pointers to blocks (e.g. 0,4,8,16 or
                                 1-8,32)
@@ -37,4 +39,4 @@ From the Refriender project subdirectory:
   filename (pos. 0)             Required. File to scan
 ```
 
-Refriender can be used to find and extract all the compressed blocks in a file, either with a single algorithm, a set of algorithms, or (the very slow default) all of them. It can also find pointers to those blocks, or to just before the block, as is often the case with archive files.
+Refriender can be used to find and extract all the compressed blocks in a file, either with a single algorithm, a set of algorithms, or (the very slow default) all of them. It can also find pointers to those blocks, or to just before the block, as is often the case with archive files. Additionally, libmagic can be used to identify the contents of decompressed blocks.
