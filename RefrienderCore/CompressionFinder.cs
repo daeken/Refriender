@@ -16,7 +16,8 @@ namespace RefrienderCore {
 		Lzma = 16, 
 		Lzma2 = 32, 
 		Lzw = 64, 
-		Lz4 = 128, 
+		Lz4Raw = 128, 
+		Lz4Frame = 256, 
 		All = 0x7FFFFFFF
 	}
 	
@@ -28,7 +29,7 @@ namespace RefrienderCore {
 		public CompressionFinder(byte[] data, int minLength = 1, bool removeOverlapping = true, bool positionOnly = false, CompressionAlgorithm algorithms = CompressionAlgorithm.All, int logLevel = 2) {
 			Data = data;
 
-			for(var bit = 1; bit <= (int) CompressionAlgorithm.Lz4; bit <<= 1) {
+			for(var bit = 1; bit <= (int) CompressionAlgorithm.Lz4Frame; bit <<= 1) {
 				if(((int) algorithms & bit) == 0) continue;
 				var algo = (CompressionAlgorithm) bit;
 				var helper = GetHelper(algo);
@@ -62,7 +63,8 @@ namespace RefrienderCore {
 			CompressionAlgorithm.Lzma => new LzmaHelper(false),
 			CompressionAlgorithm.Lzma2 => new LzmaHelper(true),
 			CompressionAlgorithm.Lzw => new LzwHelper(),
-			CompressionAlgorithm.Lz4 => new Lz4Helper(),
+			CompressionAlgorithm.Lz4Raw => new Lz4RawHelper(),
+			CompressionAlgorithm.Lz4Frame => new Lz4FrameHelper(),
 			_ => throw new NotImplementedException()
 		};
 
