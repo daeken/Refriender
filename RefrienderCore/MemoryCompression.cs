@@ -13,14 +13,30 @@ namespace RefrienderCore {
 			return arr;
 		}
 
-		public int TryDecompress(byte[] data, int offset, int inputSize, int maxLen) {
+		public int TryDecompress(byte[] data, int offset, int inputSize, int? maxLen) {
+			if(maxLen == null) {
+				var dsize = 0;
+				var ssize = 1;
+				while(true) {
+					var tsize = TryDecompress(data, offset, inputSize, ssize);
+					if(tsize > dsize)
+						dsize = tsize;
+					else if(tsize > 0 || ssize >= int.MaxValue >> 1)
+						break;
+					ssize <<= 1;
+				}
+				return dsize;
+			}
+
 			// TODO: Figure out good sane ratio
-			var tlen = maxLen * 128;
+			var tlen = maxLen.Value * 128;
 			if(Buffer.Value == null || Buffer.Value.Length < tlen)
 				Buffer.Value = new byte[tlen];
 			return Decompress(new ReadOnlyMemory<byte>(data, offset, inputSize), Buffer.Value);
 		}
 
+		public virtual bool IsPossible(byte[] data, int offset, int inputSize) => true;
+		
 		protected abstract int Decompress(ReadOnlyMemory<byte> input, Span<byte> output);
 	}
 }

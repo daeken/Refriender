@@ -70,21 +70,18 @@ namespace RefrienderCore {
 
 		IEnumerable<int> FindStarts(ICompressionAlgo algo, int minLength) =>
 			Enumerable.Range(0, Data.Length - 1).AsParallel()
-				.Where(i => algo.TryDecompress(Data, i, Data.Length - i, minLength) >= minLength);
+				.Where(i => algo.IsPossible(Data, i, Data.Length - i) &&
+				            algo.TryDecompress(Data, i, Data.Length - i, minLength) >= minLength);
  
 		(int Offset, int Length, int DecompressedLength) FindBlock(ICompressionAlgo algo, int start) {
 			var top = Data.Length;
 			var bottom = start;
-			var dsize = Math.Max(1, algo.TryDecompress(Data, start, top - start, 1));
-			while(true) {
-				var tsize = algo.TryDecompress(Data, start, top - start, dsize * 2);
-				if(tsize > dsize)
-					dsize = tsize;
-				else if(tsize == -1)
-					dsize *= 2;
-				else if(tsize > 0)
-					break;
-			}
+			var dsize = algo.TryDecompress(Data, start, top - start);
+			var tsize = 1;
+			var msize = Data.Length - start;
+			while(tsize < msize && algo.TryDecompress(Data, start, tsize, dsize) < dsize)
+				tsize = Math.Min(tsize >= int.MaxValue >> 1 ? int.MaxValue : tsize * 2, msize);
+			top = start + tsize;
 			while(top - bottom > 1) {
 				var middle = (top - bottom) / 2 + bottom;
 				var hsize = algo.TryDecompress(Data, start, middle - start, dsize);
@@ -93,7 +90,7 @@ namespace RefrienderCore {
 				else
 					top = middle;
 			}
-
+			
 			return (start, top - start, dsize);
 		}
 

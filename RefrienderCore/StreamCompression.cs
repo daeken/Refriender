@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using Microsoft.Toolkit.HighPerformance;
 
 namespace RefrienderCore {
 	abstract class StreamCompression : ICompressionAlgo {
@@ -13,12 +14,12 @@ namespace RefrienderCore {
 			return bdata;
 		}
 
-		public int TryDecompress(byte[] data, int offset, int inputSize, int maxLen) {
-			using var ms = new MemoryStream(data, offset, inputSize);
+		public int TryDecompress(byte[] data, int offset, int inputSize, int? maxLen) {
+			using var ms = new ReadOnlyMemory<byte>(data, offset, inputSize).AsStream();
 			using var ds = GetDecompressor(ms);
 			var size = 0;
 			try {
-				while(size < maxLen && ds.ReadByte() != -1)
+				while((maxLen == null || size < maxLen) && ds.ReadByte() != -1)
 					size++;
 			} catch(Exception) {
 				if(size == 0)
@@ -26,6 +27,8 @@ namespace RefrienderCore {
 			}
 			return size;
 		}
+		
+		public virtual bool IsPossible(byte[] data, int offset, int inputSize) => true;
 
 		protected abstract Stream GetDecompressor(Stream input);
 	}
