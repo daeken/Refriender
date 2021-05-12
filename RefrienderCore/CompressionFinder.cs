@@ -14,11 +14,9 @@ namespace RefrienderCore {
 		Zlib = 2, 
 		Gzip = 4, 
 		Bzip2 = 8, 
-		Lzma = 16, 
-		Lzma2 = 32, 
-		Lzw = 64, 
-		Lz4Raw = 128, 
-		Lz4Frame = 256, 
+		Lzw = 16, 
+		Lz4Raw = 32, 
+		Lz4Frame = 64, 
 		All = 0x7FFFFFFF
 	}
 	
@@ -74,8 +72,6 @@ namespace RefrienderCore {
 			CompressionAlgorithm.Zlib => new ZlibHelper(),
 			CompressionAlgorithm.Gzip => new GzipHelper(),
 			CompressionAlgorithm.Bzip2 => new Bzip2Helper(),
-			CompressionAlgorithm.Lzma => new LzmaHelper(false),
-			CompressionAlgorithm.Lzma2 => new LzmaHelper(true),
 			CompressionAlgorithm.Lzw => new LzwHelper(),
 			CompressionAlgorithm.Lz4Raw => new Lz4RawHelper(),
 			CompressionAlgorithm.Lz4Frame => new Lz4FrameHelper(),

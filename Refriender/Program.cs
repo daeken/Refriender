@@ -16,8 +16,6 @@ namespace Refriender {
 			["zlib"] = CompressionAlgorithm.Zlib,
 			["gzip"] = CompressionAlgorithm.Gzip,
 			["bzip2"] = CompressionAlgorithm.Bzip2, 
-			["lzma"] = CompressionAlgorithm.Lzma, 
-			["lzma2"] = CompressionAlgorithm.Lzma2, 
 			["lzw"] = CompressionAlgorithm.Lzw, 
 			["lz4raw"] = CompressionAlgorithm.Lz4Raw, 
 			["lz4frame"] = CompressionAlgorithm.Lz4Frame, 
@@ -42,7 +40,7 @@ namespace Refriender {
 			public bool PreserveOverlapping { get; set; }
 			[Option('e', "extract-to", Required = false, HelpText = "Path for extraction")]
 			public string ExtractTo { get; set; }
-			[Option('a', "algorithms", Required = false, Default = "all", HelpText = "Comma-separated list of algorithms (valid options: all (!SLOW!), deflate, zlib, gzip, bzip2, lzma, lzma2, lzw, lz4raw, lz4frame)")]
+			[Option('a', "algorithms", Required = false, Default = "all", HelpText = "Comma-separated list of algorithms (valid options: all (!SLOW!), deflate, zlib, gzip, bzip2, lzw, lz4raw, lz4frame)")]
 			public string Algorithms { get; set; }
 			[Option('f', "find-pointers", Required = false, HelpText = "Comma-separated list of offsets/ranges in which to search for pointers to blocks (e.g. 0,4,8,16 or 1-8,32)")]
 			public string FindPointers { get; set; }
