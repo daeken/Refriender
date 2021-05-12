@@ -44,6 +44,8 @@ namespace Refriender {
 			public string Algorithms { get; set; }
 			[Option('f', "find-pointers", Required = false, HelpText = "Comma-separated list of offsets/ranges in which to search for pointers to blocks (e.g. 0,4,8,16 or 1-8,32)")]
 			public string FindPointers { get; set; }
+			[Option('F', "find-end-pointers", Required = false, HelpText = "Comma-separated list of offsets/ranges in which to search for pointers to the end of blocks (e.g. 0,4,8,16 or 1-8,32)")]
+			public string FindEndPointers { get; set; }
 			[Option('m', "min-length", Required = false, Default = 128, HelpText = "Minimum decompressed block length in bytes")]
 			public int MinLength { get; set; }
 			[Value(0, Required = true, MetaName = "filename", HelpText = "File to scan")]
@@ -72,6 +74,7 @@ namespace Refriender {
 						_ when opt.Verbose => "-v/--verbose", 
 						_ when opt.Identify => "-i/--identify",
 						_ when opt.FindPointers != null => "-f/--find-pointers", 
+						_ when opt.FindEndPointers != null => "-F/--find-end-pointers", 
 						_ => throw new NotSupportedException()
 					});
 					Environment.Exit(1);
@@ -113,8 +116,8 @@ namespace Refriender {
 						Console.WriteLine($"{cf.Blocks.Count} blocks found");
 					}
 
-					if(opt.FindPointers != null) {
-						var offsets = opt.FindPointers.Split(',').Select(x => {
+					void DoFind(string spec, bool isEnd) {
+						var offsets = spec.Split(',').Select(x => {
 							try {
 								var a = x.Trim().Split('-');
 								var start = int.Parse(a[0]);
@@ -122,25 +125,38 @@ namespace Refriender {
 									? Enumerable.Range(start, int.Parse(a[1]) - start + 1)
 									: new[] { start };
 							} catch(Exception) {
-								Console.Error.WriteLine($"ERROR: Invalid offset string for -f/--find-pointers: {x.Trim()}");
+								Console.Error.WriteLine(isEnd
+									? $"ERROR: Invalid offset string for -F/--find-end-pointers: {x.Trim()}"
+									: $"ERROR: Invalid offset string for -f/--find-pointers: {x.Trim()}");
 								Environment.Exit(1);
 								throw;
 							}
 						}).SelectMany(x => x);
 						foreach(var offset in offsets) {
-							if(opt.Verbose)
+							if(opt.Verbose && isEnd)
+								Console.WriteLine($"Finding pointers to {offset} bytes after the blocks");
+							else if(opt.Verbose)
 								Console.WriteLine(offset == 0
 									? "Finding pointers to blocks"
 									: $"Finding pointers to {offset} bytes before the blocks");
 							var bpointers = cf.Blocks.AsParallel()
-								.Select(x => (x, cf.FindPointers(x.Offset - offset)))
+								.Select(x => (x, cf.FindPointers(isEnd ? x.Offset + x.CompressedLength + offset : x.Offset - offset)))
 								.Where(x => x.Item2.Count != 0)
 								.OrderBy(x => x.Item2.First()).ToList();
 							foreach(var (block, pointers) in bpointers)
-								Console.WriteLine($"Block 0x{block.Offset:X}{(offset != 0 ? $" (- {offset} == 0x{block.Offset - offset:X})" : "")} has pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
-							Console.WriteLine($"Pointers with offset {offset}: {bpointers.Select(x => x.Item2.Count).Sum()}");
+								if(isEnd)
+									Console.WriteLine($"Block 0x{block.Offset:X}-0x{block.Offset+block.CompressedLength:X}" + 
+									                  $"{(offset != 0 ? $" (+ {offset} == 0x{block.Offset+block.CompressedLength + offset:X})" : "")} " +
+									                  $"has end pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
+								else
+									Console.WriteLine($"Block 0x{block.Offset:X}{(offset != 0 ? $" (- {offset} == 0x{block.Offset - offset:X})" : "")} " +
+									                  $"has pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
+							Console.WriteLine(
+								$"{(isEnd ? "End p" : "P")}ointers with offset {offset}: {bpointers.Select(x => x.Item2.Count).Sum()}");
 						}
 					}
+					if(opt.FindPointers != null) DoFind(opt.FindPointers, false);
+					if(opt.FindEndPointers != null) DoFind(opt.FindEndPointers, true);
 
 					if(opt.ExtractTo == null && !opt.Identify) return;
 					if(opt.Identify) {

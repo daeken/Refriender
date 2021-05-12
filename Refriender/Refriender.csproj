@@ -6,8 +6,10 @@
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>refriender</ToolCommandName>
         <PackageOutputPath>./nupkg</PackageOutputPath>
-        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+        <PackageVersion>1.1.0</PackageVersion>
+        <AssemblyVersion>1.1.0.0</AssemblyVersion>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Description>Refriender is a tool for reverse-engineering and analyzing archive file formats.</Description>
     </PropertyGroup>
 
     <ItemGroup>

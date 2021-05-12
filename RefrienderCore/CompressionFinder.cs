@@ -87,14 +87,13 @@ namespace RefrienderCore {
  
 		(long Offset, int Length, int DecompressedLength) FindBlock(ICompressionAlgo algo, long start) {
 			var slice = Data.Slice(start);
-			var top = slice.Length;
 			var bottom = 0;
 			var dsize = algo.TryDecompress(slice);
 			var tsize = 1;
 			var msize = slice.Length;
 			while(tsize < msize && algo.TryDecompress(slice, tsize, dsize) < dsize)
 				tsize = Math.Min(tsize >= int.MaxValue >> 1 ? int.MaxValue : tsize * 2, msize);
-			top = tsize;
+			var top = tsize;
 			while(top - bottom > 1) {
 				var middle = (top - bottom) / 2 + bottom;
 				var hsize = algo.TryDecompress(slice, middle, dsize);
