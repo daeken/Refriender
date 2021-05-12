@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommandLine;
+using CommandLine.Text;
 using HeyRed.Mime;
 using MoreLinq;
 using RefrienderCore;
@@ -50,8 +51,22 @@ namespace Refriender {
 			[Value(0, Required = true, MetaName = "filename", HelpText = "File to scan")]
 			public string Filename { get; set; }
 		}
+
+		static void DisplayHelp(ParserResult<Options> result) {
+			Console.Error.WriteLine(HelpText.AutoBuild(result, h => {
+				h.AdditionalNewLineAfterOption = false;
+				h.Heading = "Refriender 1.0.0";
+				h.Copyright = "Copyright (c) 2021 Serafina Brocious";
+				h.AutoVersion = false;
+				return HelpText.DefaultParsingErrorsHandler(result, h);
+			}, e => e));
+			Environment.Exit(1);
+		}
+		
 		static void Main(string[] args) {
-			Parser.Default.ParseArguments<Options>(args).WithParsed(opt => {
+			var result = new Parser(with => with.HelpWriter = null).ParseArguments<Options>(args);
+			result.WithNotParsed(errs => DisplayHelp(result))
+			.WithParsed(opt => {
 				if(opt.Quiet && (opt.StartOnly || opt.Verbose || opt.Identify || opt.FindPointers != null)) {
 					Console.Error.Write("ERROR: -q/--quiet cannot be combined with ");
 					Console.Error.WriteLine(true switch {
