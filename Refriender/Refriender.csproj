@@ -3,6 +3,11 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net5.0</TargetFramework>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>refriender</ToolCommandName>
+        <PackageOutputPath>./nupkg</PackageOutputPath>
+        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
     </PropertyGroup>
 
     <ItemGroup>

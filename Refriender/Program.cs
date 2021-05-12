@@ -40,7 +40,7 @@ namespace Refriender {
 			public bool PreserveOverlapping { get; set; }
 			[Option('e', "extract-to", Required = false, HelpText = "Path for extraction")]
 			public string ExtractTo { get; set; }
-			[Option('a', "algorithms", Required = false, Default = "all", HelpText = "Comma-separated list of algorithms (valid options: all (!SLOW!), deflate, zlib, gzip, bzip2, lzw, lz4raw, lz4frame)")]
+			[Option('a', "algorithms", Required = false, Default = "all", HelpText = "Comma-separated list of algorithms (valid options: all, deflate, zlib, gzip, bzip2, lzw, lz4raw, lz4frame)")]
 			public string Algorithms { get; set; }
 			[Option('f', "find-pointers", Required = false, HelpText = "Comma-separated list of offsets/ranges in which to search for pointers to blocks (e.g. 0,4,8,16 or 1-8,32)")]
 			public string FindPointers { get; set; }
@@ -53,7 +53,7 @@ namespace Refriender {
 		static void DisplayHelp(ParserResult<Options> result) {
 			Console.Error.WriteLine(HelpText.AutoBuild(result, h => {
 				h.AdditionalNewLineAfterOption = false;
-				h.Heading = "Refriender 1.0.0";
+				h.Heading = $"Refriender {typeof(Program).Assembly.GetName().Version}";
 				h.Copyright = "Copyright (c) 2021 Serafina Brocious";
 				h.AutoVersion = false;
 				return HelpText.DefaultParsingErrorsHandler(result, h);
