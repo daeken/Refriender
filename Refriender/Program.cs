@@ -135,7 +135,7 @@ namespace Refriender {
 							var bpointers = cf.Blocks.AsParallel()
 								.Select(x => (x, cf.FindPointers(x.Offset - offset)))
 								.Where(x => x.Item2.Count != 0)
-								.OrderBy(x => x.x.Offset).ToList();
+								.OrderBy(x => x.Item2.First()).ToList();
 							foreach(var (block, pointers) in bpointers)
 								Console.WriteLine($"Block 0x{block.Offset:X}{(offset != 0 ? $" (- {offset} == 0x{block.Offset - offset:X})" : "")} has pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
 							Console.WriteLine($"Pointers with offset {offset}: {bpointers.Select(x => x.Item2.Count).Sum()}");

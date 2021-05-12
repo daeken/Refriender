@@ -143,7 +143,7 @@ namespace RefrienderCore {
 							}
 			}
 
-			return list;
+			return list.OrderBy(x => x).ToList();
 		}
 
 		public byte[] Decompress(
