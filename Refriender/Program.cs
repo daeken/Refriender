@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using CommandLine;
 using HeyRed.Mime;
 using MoreLinq;
@@ -105,12 +106,12 @@ namespace Refriender {
 					if(opt.ExtractTo != null) {
 						if(opt.Verbose) Console.WriteLine("Beginning block extraction");
 						Directory.CreateDirectory(opt.ExtractTo);
-						foreach(var block in cf.Blocks) {
+						Parallel.ForEach(cf.Blocks, block => {
 							var fn =
 								$"0x{block.Offset:X}-0x{block.Offset + block.CompressedLength:X}_{RevAlgorithms[block.Algorithm]}.bin";
 							var bdata = cf.Decompress(block);
 							File.WriteAllBytes(Path.Join(opt.ExtractTo, fn), bdata);
-						}
+						});
 						if(opt.Verbose) Console.WriteLine("Done!");
 					}
 				}

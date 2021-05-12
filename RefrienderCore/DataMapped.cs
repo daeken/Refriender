@@ -18,7 +18,6 @@ namespace RefrienderCore {
 			Clusters = LongEnumerable.Range(0, nClusters).Select(i => {
 				var addr = i << 30;
 				var il = (int) Math.Min(Length - addr, int.MaxValue);
-				Console.WriteLine($"Cluster {i} -- 0x{addr:X} - 0x{addr+il:X}");
 				return (ReadOnlyMemory<byte>) Map.CreateMemoryAccessor(addr, il, MemoryMappedFileAccess.Read).Memory;
 			}).ToArray();
 		}
