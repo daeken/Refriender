@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,11 +23,11 @@ namespace RefrienderCore {
 	}
 	
 	public class CompressionFinder {
-		readonly byte[] Data;
-		public readonly List<(CompressionAlgorithm Algorithm, int Offset)> StartingPositions = new();
-		public readonly List<(CompressionAlgorithm Algorithm, int Offset, int CompressedLength, int DecompressedLength)> Blocks = new();
+		readonly IData Data;
+		public readonly List<(CompressionAlgorithm Algorithm, long Offset)> StartingPositions = new();
+		public readonly List<(CompressionAlgorithm Algorithm, long Offset, int CompressedLength, int DecompressedLength)> Blocks = new();
 		
-		public CompressionFinder(byte[] data, int minLength = 1, bool removeOverlapping = true, bool positionOnly = false, CompressionAlgorithm algorithms = CompressionAlgorithm.All, int logLevel = 2) {
+		public CompressionFinder(IData data, int minLength = 1, bool removeOverlapping = true, bool positionOnly = false, CompressionAlgorithm algorithms = CompressionAlgorithm.All, int logLevel = 2) {
 			Data = data;
 
 			for(var bit = 1; bit <= (int) CompressionAlgorithm.Lz4Frame; bit <<= 1) {
@@ -43,6 +44,7 @@ namespace RefrienderCore {
 					if(removeOverlapping) {
 						if(logLevel == 2) Console.WriteLine("Removing overlapping blocks");
 						blocks = blocks
+							.AsParallel()
 							.Where(block =>
 								!blocks.Any(x =>
 									x.Offset < block.Offset && x.Offset + x.Length >= block.Offset + block.Length))
@@ -68,54 +70,72 @@ namespace RefrienderCore {
 			_ => throw new NotImplementedException()
 		};
 
-		IEnumerable<int> FindStarts(ICompressionAlgo algo, int minLength) =>
-			Enumerable.Range(0, Data.Length - 1).AsParallel()
-				.Where(i => algo.IsPossible(Data, i, Data.Length - i) &&
-				            algo.TryDecompress(Data, i, Data.Length - i, minLength) >= minLength);
+		IEnumerable<long> FindStarts(ICompressionAlgo algo, int minLength) =>
+			LongEnumerable.Range(0, Data.Length - 1)//.AsParallel()
+				.Where(i => {
+					var slice = Data.Slice(i);
+					return algo.IsPossible(slice.Span) && algo.TryDecompress(slice, maxLen: minLength) >= minLength;
+				});
  
-		(int Offset, int Length, int DecompressedLength) FindBlock(ICompressionAlgo algo, int start) {
-			var top = Data.Length;
-			var bottom = start;
-			var dsize = algo.TryDecompress(Data, start, top - start);
+		(long Offset, int Length, int DecompressedLength) FindBlock(ICompressionAlgo algo, long start) {
+			var slice = Data.Slice(start);
+			var top = slice.Length;
+			var bottom = 0;
+			var dsize = algo.TryDecompress(slice);
 			var tsize = 1;
-			var msize = Data.Length - start;
-			while(tsize < msize && algo.TryDecompress(Data, start, tsize, dsize) < dsize)
+			var msize = slice.Length;
+			while(tsize < msize && algo.TryDecompress(slice, tsize, dsize) < dsize)
 				tsize = Math.Min(tsize >= int.MaxValue >> 1 ? int.MaxValue : tsize * 2, msize);
-			top = start + tsize;
+			top = tsize;
 			while(top - bottom > 1) {
 				var middle = (top - bottom) / 2 + bottom;
-				var hsize = algo.TryDecompress(Data, start, middle - start, dsize);
+				var hsize = algo.TryDecompress(slice, middle, dsize);
 				if(hsize != dsize)
 					bottom = middle;
 				else
 					top = middle;
 			}
 			
-			return (start, top - start, dsize);
+			return (start, top, dsize);
 		}
 
-		public IEnumerable<int> FindPointers(int offset) {
-			if(offset < 0x20) yield break;
-			// TODO: Figure out a good heuristic for whether we should handle shorts here
-			/*var bytes = (offset <= ushort.MaxValue)
-				? BitConverter.GetBytes((ushort) offset)
-				: BitConverter.GetBytes((uint) offset);*/
-			var bytes = BitConverter.GetBytes((uint) offset);
-			var rbytes = bytes.Reverse().ToArray();
+		public List<long> FindPointers(long offset) {
+			var list = new List<long>();
+			if(offset < 0x20) return list;
+			
+			// TODO: We should be walking blocks instead of iterating over the whole file
+			// TODO: This also will miss pointers that fall across span boundaries
 
-			var size = bytes.Length;
-			for(var i = 0; i < Data.Length - size; ++i)
-				if(Data[i + 0] == bytes[0] && Data[i + 1] == bytes[1] &&
-				   (size == 2 || (Data[i + 2] == bytes[2] && Data[i + 3] == bytes[3])) ||
-				   (Data[i + 0] == rbytes[0] && Data[i + 1] == rbytes[1] &&
-				    (size == 2 || (Data[i + 2] == rbytes[2] && Data[i + 3] == rbytes[3]))))
-					if(!Blocks.Any(x => x.Offset <= i && x.Offset + x.CompressedLength >= i))
-						yield return i;
+			if(offset <= int.MaxValue) {
+				var uoffset = (uint) offset;
+				var roffset = BitConverter.ToUInt32(BitConverter.GetBytes(uoffset).Reverse().ToArray());
+
+				for(var o = 0; o < 4; ++o)
+					for(var j = 0L; j < Data.Length; j += 1L << 31) {
+						var mem = MemoryMarshal.Cast<byte, uint>(Data.Slice(j + o).Span);
+						for(var i = 0; i < mem.Length; ++i)
+							if(mem[i] == uoffset || mem[i] == roffset)
+								list.Add(j + o + (i << 2));
+					}
+			} else {
+				var uoffset = (ulong) offset;
+				var roffset = BitConverter.ToUInt64(BitConverter.GetBytes(uoffset).Reverse().ToArray());
+
+				for(var o = 0; o < 8; ++o)
+					for(var j = 0L; j < Data.Length; j += 1L << 31) {
+						var mem = MemoryMarshal.Cast<byte, ulong>(Data.Slice(j + o).Span);
+						for(var i = 0; i < mem.Length; ++i)
+							if(mem[i] == uoffset || mem[i] == roffset)
+								list.Add(j + o + (i << 3));
+					}
+			}
+
+			return list;
 		}
 
 		public byte[] Decompress(
-			(CompressionAlgorithm Algorithm, int Offset, int CompressedLength, int DecompressedLength) block
+			(CompressionAlgorithm Algorithm, long Offset, int CompressedLength, int DecompressedLength) block
 		) =>
-			GetHelper(block.Algorithm).Decompress(Data, block.Offset, block.CompressedLength, block.DecompressedLength);
+			GetHelper(block.Algorithm).Decompress(Data.Slice(block.Offset, block.CompressedLength), block.DecompressedLength);
 	}
 }

@@ -6,16 +6,16 @@ namespace RefrienderCore {
 	abstract class StreamCompression : ICompressionAlgo {
 		public abstract CompressionAlgorithm Algorithm { get; }
 
-		public byte[] Decompress(byte[] data, int offset, int compressedSize, int decompressedSize) {
+		public byte[] Decompress(ReadOnlyMemory<byte> data, int decompressedSize) {
 			var bdata = new byte[decompressedSize];
-			using var ms = new MemoryStream(data, offset, compressedSize);
+			using var ms = data.AsStream();
 			using var ds = GetDecompressor(ms);
 			ds.Read(bdata, 0, decompressedSize);
 			return bdata;
 		}
 
-		public int TryDecompress(byte[] data, int offset, int inputSize, int? maxLen) {
-			using var ms = new ReadOnlyMemory<byte>(data, offset, inputSize).AsStream();
+		public int TryDecompress(ReadOnlyMemory<byte> data, int? inputSize, int? maxLen) {
+			using var ms = data[..(inputSize ?? data.Length)].AsStream();
 			using var ds = GetDecompressor(ms);
 			var size = 0;
 			try {
@@ -28,7 +28,7 @@ namespace RefrienderCore {
 			return size;
 		}
 		
-		public virtual bool IsPossible(byte[] data, int offset, int inputSize) => true;
+		public virtual bool IsPossible(ReadOnlySpan<byte> data) => true;
 
 		protected abstract Stream GetDecompressor(Stream input);
 	}

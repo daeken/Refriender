@@ -20,7 +20,7 @@ namespace RefrienderCore {
 			}
 		}
 		
-		public override bool IsPossible(byte[] data, int offset, int inputSize) =>
-			inputSize > 11 && BitConverter.ToUInt32(data, offset) == 0x184D2204;
+		public override bool IsPossible(ReadOnlySpan<byte> data) =>
+			data.Length > 11 && BitConverter.ToUInt32(data) == 0x184D2204;
 	}
 }

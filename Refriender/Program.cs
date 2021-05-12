@@ -34,6 +34,8 @@ namespace Refriender {
 			public bool StartOnly { get; set; }
 			[Option('i', "identify", Required = false, HelpText = "Look for magic in decompressed blocks")]
 			public bool Identify { get; set; }
+			[Option("read-file", Required = false, HelpText = "Read entire file into memory instead of mapping (Warning: ONLY works for files <=2GB)")]
+			public bool ReadFile { get; set; }
 			[Option('p', "preserve-overlapping", Required = false, HelpText = "Preserve overlapping blocks")]
 			public bool PreserveOverlapping { get; set; }
 			[Option('e', "extract-to", Required = false, HelpText = "Path for extraction")]
@@ -53,8 +55,12 @@ namespace Refriender {
 					throw new NotSupportedException(); // TODO: Error messages
 				var algorithms = (CompressionAlgorithm) opt.Algorithms.Split(',')
 					.Select(x => (int) Algorithms[x.Trim().ToLower()]).Sum();
-				var data = File.ReadAllBytes(opt.Filename);
-				var cf = new CompressionFinder(data, minLength: opt.MinLength, algorithms: algorithms, positionOnly: opt.StartOnly, removeOverlapping: !opt.PreserveOverlapping, logLevel: opt.Quiet ? 0 : opt.Verbose ? 2 : 1);
+				IData data = opt.ReadFile
+					? new DataBytes(File.ReadAllBytes(opt.Filename))
+					: new DataMapped(opt.Filename);
+				var cf = new CompressionFinder(data, minLength: opt.MinLength, algorithms: algorithms,
+					positionOnly: opt.StartOnly, removeOverlapping: !opt.PreserveOverlapping,
+					logLevel: opt.Quiet ? 0 : opt.Verbose ? 2 : 1);
 				if(opt.StartOnly) {
 					foreach(var (algorithm, offset) in cf.StartingPositions.OrderBy(x => x.Offset))
 						Console.WriteLine($"[{RevAlgorithms[algorithm]}] Block starts at 0x{offset:X}");
@@ -78,7 +84,7 @@ namespace Refriender {
 							if(opt.Verbose)
 								Console.WriteLine($"Finding pointers to {offset} bytes before the blocks");
 							var bpointers = cf.Blocks.AsParallel()
-								.Select(x => (x, cf.FindPointers(x.Offset - offset).ToList()))
+								.Select(x => (x, cf.FindPointers(x.Offset - offset)))
 								.Where(x => x.Item2.Count != 0)
 								.OrderBy(x => x.x.Offset);
 							foreach(var (block, pointers) in bpointers)
