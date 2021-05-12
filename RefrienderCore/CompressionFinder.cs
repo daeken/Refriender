@@ -71,11 +71,11 @@ namespace RefrienderCore {
 		};
 
 		IEnumerable<long> FindStarts(ICompressionAlgo algo, int minLength) =>
-			LongEnumerable.Range(0, Data.Length - 1)//.AsParallel()
-				.Where(i => {
+			LongEnumerable.ParallelRange(0, Data.Length - 1, 
+				range => range.Where(i => {
 					var slice = Data.Slice(i);
 					return algo.IsPossible(slice.Span) && algo.TryDecompress(slice, maxLen: minLength) >= minLength;
-				});
+				}));
  
 		(long Offset, int Length, int DecompressedLength) FindBlock(ICompressionAlgo algo, long start) {
 			var slice = Data.Slice(start);
