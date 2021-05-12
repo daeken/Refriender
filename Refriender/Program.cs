@@ -44,7 +44,7 @@ namespace Refriender {
 			public string Algorithms { get; set; }
 			[Option('f', "find-pointers", Required = false, HelpText = "Comma-separated list of offsets/ranges in which to search for pointers to blocks (e.g. 0,4,8,16 or 1-8,32)")]
 			public string FindPointers { get; set; }
-			[Option('m', "min-length", Required = false, Default = 1, HelpText = "Minimum decompressed block length")]
+			[Option('m', "min-length", Required = false, Default = 128, HelpText = "Minimum decompressed block length in bytes")]
 			public int MinLength { get; set; }
 			[Value(0, Required = true, MetaName = "filename", HelpText = "File to scan")]
 			public string Filename { get; set; }
