@@ -26,6 +26,7 @@ namespace RefrienderCore {
 		readonly IData Data;
 		public readonly List<(CompressionAlgorithm Algorithm, long Offset)> StartingPositions = new();
 		public readonly List<(CompressionAlgorithm Algorithm, long Offset, int CompressedLength, int DecompressedLength)> Blocks = new();
+		public readonly List<(long Offset, long Length)> NonBlocks = new();
 		
 		public CompressionFinder(IData data, int minLength = 1, bool removeOverlapping = true, bool positionOnly = false, CompressionAlgorithm algorithms = CompressionAlgorithm.All, int logLevel = 2) {
 			Data = data;
@@ -55,6 +56,17 @@ namespace RefrienderCore {
 					StartingPositions.AddRange(blocks.Select(x => (algo, x.Offset)));
 				}
 			}
+
+			if(positionOnly) return;
+
+			var cpos = 0L;
+			foreach(var (_, offset, compressedLength, _) in Blocks) {
+				if(cpos < offset)
+					NonBlocks.Add((cpos, offset - cpos));
+				cpos = offset + compressedLength;
+			}
+			if(cpos < data.Length)
+				NonBlocks.Add((cpos, data.Length - cpos));
 		}
 
 		ICompressionAlgo GetHelper(CompressionAlgorithm algo) => algo switch {
@@ -103,31 +115,36 @@ namespace RefrienderCore {
 			var list = new List<long>();
 			if(offset < 0x20) return list;
 			
-			// TODO: We should be walking blocks instead of iterating over the whole file
-			// TODO: This also will miss pointers that fall across span boundaries
-
 			if(offset <= int.MaxValue) {
 				var uoffset = (uint) offset;
 				var roffset = BitConverter.ToUInt32(BitConverter.GetBytes(uoffset).Reverse().ToArray());
-
-				for(var o = 0; o < 4; ++o)
-					for(var j = 0L; j < Data.Length; j += 1L << 31) {
-						var mem = MemoryMarshal.Cast<byte, uint>(Data.Slice(j + o).Span);
-						for(var i = 0; i < mem.Length; ++i)
-							if(mem[i] == uoffset || mem[i] == roffset)
-								list.Add(j + o + (i << 2));
-					}
+				
+				foreach(var (nbo, nbs) in NonBlocks)
+					if(nbs >= 4)
+						for(var j = 0L; j < nbs; j += (1L << 30) - 3)
+							for(var o = 0; o < 4; ++o) {
+								var sl = Math.Min(nbs - j - o, 1L << 30);
+								if(sl < 4) break;
+								var mem = MemoryMarshal.Cast<byte, uint>(Data.Slice(nbo + j + o, sl).Span);
+								for(var i = 0; i < mem.Length; ++i)
+									if(mem[i] == uoffset || mem[i] == roffset)
+										list.Add(nbo + j + o + (i << 2));
+							}
 			} else {
 				var uoffset = (ulong) offset;
 				var roffset = BitConverter.ToUInt64(BitConverter.GetBytes(uoffset).Reverse().ToArray());
-
-				for(var o = 0; o < 8; ++o)
-					for(var j = 0L; j < Data.Length; j += 1L << 31) {
-						var mem = MemoryMarshal.Cast<byte, ulong>(Data.Slice(j + o).Span);
-						for(var i = 0; i < mem.Length; ++i)
-							if(mem[i] == uoffset || mem[i] == roffset)
-								list.Add(j + o + (i << 3));
-					}
+				
+				foreach(var (nbo, nbs) in NonBlocks)
+					if(nbs >= 8)
+						for(var j = 0L; j < nbs; j += (1L << 30) - 7)
+							for(var o = 0; o < 8; ++o) {
+								var sl = Math.Min(nbs - j - o, 1L << 30);
+								if(sl < 8) break;
+								var mem = MemoryMarshal.Cast<byte, uint>(Data.Slice(nbo + j + o, sl).Span);
+								for(var i = 0; i < mem.Length; ++i)
+									if(mem[i] == uoffset || mem[i] == roffset)
+										list.Add(nbo + j + o + (i << 2));
+							}
 			}
 
 			return list;

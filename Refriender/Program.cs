@@ -52,10 +52,37 @@ namespace Refriender {
 		}
 		static void Main(string[] args) {
 			Parser.Default.ParseArguments<Options>(args).WithParsed(opt => {
-				if(opt.Quiet && (opt.StartOnly || opt.Verbose || opt.Identify || opt.FindPointers != null || opt.ExtractTo == null))
-					throw new NotSupportedException(); // TODO: Error messages
+				if(opt.Quiet && (opt.StartOnly || opt.Verbose || opt.Identify || opt.FindPointers != null)) {
+					Console.Error.Write("ERROR: -q/--quiet cannot be combined with ");
+					Console.Error.WriteLine(true switch {
+						_ when opt.StartOnly => "-s/--start-only", 
+						_ when opt.Verbose => "-v/--verbose", 
+						_ when opt.Identify => "-i/--identify",
+						_ when opt.FindPointers != null => "-f/--find-pointers", 
+						_ => throw new NotSupportedException()
+					});
+					Environment.Exit(1);
+				}
+				if(opt.Quiet && opt.ExtractTo == null) {
+					Console.Error.WriteLine("ERROR: -q/--quiet cannot be used without -e/extract-to");
+					Environment.Exit(1);
+				}
+
+				if(!File.Exists(opt.Filename)) {
+					Console.Error.WriteLine($"ERROR: Could not find file: '{opt.Filename}'");
+					Environment.Exit(1);
+				}
+
 				var algorithms = (CompressionAlgorithm) opt.Algorithms.Split(',')
-					.Select(x => (int) Algorithms[x.Trim().ToLower()]).Sum();
+					.Select(x => x.Trim().ToLower()).Where(x => x.Length != 0)
+					.Select(x => {
+						if(!Algorithms.TryGetValue(x, out var flag)) {
+							Console.Error.WriteLine($"ERROR: Unknown compression algorithm '{x}'");
+							Environment.Exit(1);
+						}
+						return (int) flag;
+					}).Sum();
+				
 				IData data = opt.ReadFile
 					? new DataBytes(File.ReadAllBytes(opt.Filename))
 					: new DataMapped(opt.Filename);
@@ -75,21 +102,30 @@ namespace Refriender {
 
 					if(opt.FindPointers != null) {
 						var offsets = opt.FindPointers.Split(',').Select(x => {
-							var a = x.Split('-');
-							var start = int.Parse(a[0]);
-							return a.Length == 2
-								? Enumerable.Range(start, int.Parse(a[1]) - start + 1)
-								: new[] { start };
+							try {
+								var a = x.Trim().Split('-');
+								var start = int.Parse(a[0]);
+								return a.Length == 2
+									? Enumerable.Range(start, int.Parse(a[1]) - start + 1)
+									: new[] { start };
+							} catch(Exception) {
+								Console.Error.WriteLine($"ERROR: Invalid offset string for -f/--find-pointers: {x.Trim()}");
+								Environment.Exit(1);
+								throw;
+							}
 						}).SelectMany(x => x);
 						foreach(var offset in offsets) {
 							if(opt.Verbose)
-								Console.WriteLine($"Finding pointers to {offset} bytes before the blocks");
+								Console.WriteLine(offset == 0
+									? "Finding pointers to blocks"
+									: $"Finding pointers to {offset} bytes before the blocks");
 							var bpointers = cf.Blocks.AsParallel()
 								.Select(x => (x, cf.FindPointers(x.Offset - offset)))
 								.Where(x => x.Item2.Count != 0)
-								.OrderBy(x => x.x.Offset);
+								.OrderBy(x => x.x.Offset).ToList();
 							foreach(var (block, pointers) in bpointers)
 								Console.WriteLine($"Block 0x{block.Offset:X}{(offset != 0 ? $" (- {offset} == 0x{block.Offset - offset:X})" : "")} has pointers from: {string.Join(", ", pointers.Select(x => $"0x{x:X}"))}");
+							Console.WriteLine($"Pointers with offset {offset}: {bpointers.Select(x => x.Item2.Count).Sum()}");
 						}
 					}
 
